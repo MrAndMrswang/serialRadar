@@ -86,6 +86,8 @@ void Radar::paintPoints(QPainter *painter) {
 void Radar::paintEvent(QPaintEvent *event) {
   QPainter painter(this);
   paintBackground(&painter);
+  if (!_scanFlag) return;
+
   paintSector(&painter);
   paintPoints(&painter);
 }
@@ -126,3 +128,6 @@ void Radar::setPoints(QList<QPoint> points) {
   }
   _points.append(points);
 }
+
+//
+void Radar::setScanFlag(bool flag) { _scanFlag = flag; }

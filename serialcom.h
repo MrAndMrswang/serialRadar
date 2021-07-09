@@ -15,18 +15,18 @@ class SerialCom : public QWidget {
   explicit SerialCom(QWidget *parent = nullptr);
 
  signals:
-  void exportPoints(QList<QPoint> points);
-
- private slots:
-  void onOpenSerialButtonClicked();
-  void initData();
-  void changeEditMod(bool flag);
-  void invokeRPlidarDriver();
+  void exportPoints(QList<QPoint>);
+  void startScan(bool);
 
  private:
   QSerialPort *serial;
   Ui::SerialCom *ui;
   bool _canInvoke;
+
+  void init();
+  void onOpenSerialButtonClicked();
+  void changeEditMod(bool);
+  void invokeRPlidarDriver();
 };
 
 #endif  // SERIALCOM_H

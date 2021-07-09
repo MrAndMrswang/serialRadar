@@ -13,7 +13,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   radar->setFixedSize(400, 400);
   radar->move(400, 120);
 
+  // 将点信息从串口类发送给radar图
   connect(serial, &SerialCom::exportPoints, radar, &Radar::setPoints);
+
+  // radar 是否开始扫描
+  connect(serial, &SerialCom::startScan, radar, &Radar::setScanFlag);
 }
 
 MainWindow::~MainWindow() {}

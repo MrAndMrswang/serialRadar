@@ -36,10 +36,12 @@ class Radar : public QWidget {
   int _timerId;           // 定时器ID
   int _speed;             // 速度
   int _radius;            // 半径
+  bool _scanFlag;         // 开始扫描的标志
   QList<QPoint> _points;  // 绘制点
 
  public slots:
   void setPoints(QList<QPoint> points);
+  void setScanFlag(bool);
 };
 
 #endif  // RADAR_H

@@ -17,21 +17,17 @@ SerialCom::SerialCom(QWidget *parent) : ui(new Ui::SerialCom) {
   ui->setupUi(this);
   QObject::connect(ui->OpenSerialButton, &QPushButton::clicked, this,
                    &SerialCom::onOpenSerialButtonClicked);
-  initData();
+  init();
 };
 
 // 针对各数据框进行初始化
-void SerialCom::initData() {
+void SerialCom::init() {
   qDebug() << "number of available ports:"
            << QSerialPortInfo::availablePorts().size();
   // 设定可用串口
   foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts()) {
-    QSerialPort serial;
-    serial.setPort(info);
-    if (serial.open(QIODevice::ReadWrite)) {
-      ui->PortBox->addItem(serial.portName());
-      serial.close();
-    }
+    ui->PortBox->addItem(info.portName());
+    qDebug() << "port name:" << info.portName() << endl;
   }
   // 设置波特率下拉菜单
   ui->BaudBox->addItem("1200", QSerialPort::Baud1200);
@@ -48,9 +44,12 @@ void SerialCom::initData() {
 void SerialCom::onOpenSerialButtonClicked() {
   if (ui->PortBox->isEnabled()) {
     changeEditMod(false);
+    invokeRPlidarDriver();
+    emit startScan(true);
   } else {
     //恢复设置使能
     changeEditMod(true);
+    emit startScan(false);
   }
 }
 
@@ -108,21 +107,23 @@ void SerialCom::invokeRPlidarDriver() {
   //
   rplidar_response_device_info_t devinfo;
 
-  char *portName = ui->PortBox->currentText().toUtf8().data();
+  char *portName =
+      const_cast<char *>(ui->PortBox->currentText().toStdString().c_str());
   uint32_t baudRate = ui->BaudBox->currentData().toUInt();
   u_result op_result;
-  //
-  if (!drv) drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
 
-  if (!IS_OK(drv->connect(portName, baudRate))) {
-    qDebug() << "connect failed!!!" << endl;
+  qDebug() << "start connect|" << portName << "|" << baudRate << endl;
+  op_result = drv->connect(portName, baudRate);
+  if (!IS_OK(op_result)) {
+    qDebug() << "connect failed|res:" << op_result << endl;
     return;
   }
 
-  if (!IS_OK(drv->getDeviceInfo(devinfo))) {
+  op_result = drv->getDeviceInfo(devinfo);
+  if (!IS_OK(op_result)) {
     delete drv;
     drv = NULL;
-    qDebug() << "getDeviceInfo failed!!!" << endl;
+    qDebug() << "getDeviceInfo failed|res:" << op_result << endl;
     return;
   }
 
@@ -148,6 +149,7 @@ void SerialCom::invokeRPlidarDriver() {
     size_t count = _countof(nodes);
     op_result = drv->grabScanDataHq(nodes, count);
     if (!IS_OK(op_result)) {
+      qDebug() << "grabScanDataHq failed|res:" << op_result << endl;
       continue;
     }
 
@@ -160,16 +162,14 @@ void SerialCom::invokeRPlidarDriver() {
 
       angle = (nodes[pos].angle_z_q14 * 90.f / (1 << 14));
       dist = (nodes[pos].dist_mm_q2 / 4.0f);
-      if (angle > 240 && angle < 300.00) {  // change angle
-        theta = angle * M_PI / 180;
-        rho = dist;
-        x = (int)(rho * cos(theta));
-        y = (int)(rho * sin(theta));
 
-        qDebug() << "angle:" << angle << " dist:" << dist << " x:" << x
-                 << " y:" << y << endl;
-        list0.append(QPoint(x, y));
-      }
+      theta = angle * M_PI / 180;
+      rho = dist;
+      x = (int)(rho * cos(theta));
+      y = (int)(rho * sin(theta));
+      qDebug() << "angle:" << angle << " dist:" << dist << " x:" << x
+               << " y:" << y << endl;
+      list0.append(QPoint(x, y));
     }
 
     //
