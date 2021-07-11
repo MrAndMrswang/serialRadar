@@ -38,7 +38,7 @@ class Ui_SerialCom {
     //
     PortBox = new QComboBox(groupBox);
     PortBox->setObjectName(QString::fromUtf8("PortBox"));
-    PortBox->setGeometry(QRect(130, 30, 103, 25));
+    PortBox->setGeometry(QRect(100, 30, 133, 25));
     label = new QLabel(groupBox);
     label->setObjectName(QString::fromUtf8("label"));
     label->setGeometry(QRect(20, 30, 104, 25));
@@ -47,7 +47,7 @@ class Ui_SerialCom {
     //
     BaudBox = new QComboBox(groupBox);
     BaudBox->setObjectName(QString::fromUtf8("BaudBox"));
-    BaudBox->setGeometry(QRect(130, 73, 103, 25));
+    BaudBox->setGeometry(QRect(100, 73, 133, 25));
     label_2 = new QLabel(groupBox);
     label_2->setObjectName(QString::fromUtf8("label_2"));
     label_2->setGeometry(QRect(20, 73, 104, 25));
