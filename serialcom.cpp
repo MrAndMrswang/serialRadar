@@ -27,18 +27,13 @@ void SerialCom::init() {
   // 设定可用串口
   foreach (const QSerialPortInfo &info, QSerialPortInfo::availablePorts()) {
     ui->PortBox->addItem(info.portName());
-    qDebug() << "port name:" << info.portName() << endl;
+    qDebug() << "check port name:" << info.portName() << endl;
   }
+  ui->PortBox->addItem("/dev/ttyUSB0");
   // 设置波特率下拉菜单
-  ui->BaudBox->addItem("1200", QSerialPort::Baud1200);
-  ui->BaudBox->addItem("2400", QSerialPort::Baud2400);
-  ui->BaudBox->addItem("4800", QSerialPort::Baud4800);
-  ui->BaudBox->addItem("9600", QSerialPort::Baud9600);
-  ui->BaudBox->addItem("19200", QSerialPort::Baud19200);
-  ui->BaudBox->addItem("38400", QSerialPort::Baud38400);
-  ui->BaudBox->addItem("57600", QSerialPort::Baud57600);
   ui->BaudBox->addItem("115200", QSerialPort::Baud115200);
-  ui->BaudBox->setCurrentIndex(6);
+  ui->BaudBox->addItem("256000", 256000);
+  ui->BaudBox->setCurrentIndex(0);
 }
 
 void SerialCom::onOpenSerialButtonClicked() {
@@ -82,7 +77,7 @@ bool checkRPLIDARHealth(RPlidarDriver *drv) {
                   "device to retry."
                << endl;
       // enable the following code if you want rplidar to be reboot by software
-      // drv->reset();
+      //      drv->reset();
       return false;
     } else {
       return true;
@@ -113,9 +108,11 @@ void SerialCom::invokeRPlidarDriver() {
   u_result op_result;
 
   qDebug() << "start connect|" << portName << "|" << baudRate << endl;
+
+  if (!drv) drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
   op_result = drv->connect(portName, baudRate);
   if (!IS_OK(op_result)) {
-    qDebug() << "connect failed|res:" << op_result << endl;
+    qDebug() << "ERROR|connect failed|res:" << op_result << endl;
     return;
   }
 
@@ -123,25 +120,31 @@ void SerialCom::invokeRPlidarDriver() {
   if (!IS_OK(op_result)) {
     delete drv;
     drv = NULL;
-    qDebug() << "getDeviceInfo failed|res:" << op_result << endl;
+    qDebug() << "ERROR|getDeviceInfo failed|res:" << op_result << endl;
     return;
   }
 
   if (!checkRPLIDARHealth(drv)) {
-    qDebug() << "checkRPLIDARHealth failed!!!" << endl;
+    qDebug() << "ERROR|checkRPLIDARHealth failed!!!" << endl;
     return;
   }
 
   // start
-  drv->startMotor();
-  drv->startScan(0, 1);
+  op_result = drv->startMotor();
+  if (!IS_OK(op_result)) {
+    qDebug() << "ERROR|startMotor|res:" << op_result << endl;
+  }
+  op_result = drv->startScan(0, 1);
+  if (!IS_OK(op_result)) {
+    qDebug() << "ERROR|startScan|res:" << op_result << endl;
+  }
 
   //
   double angle = 0, dist = 0, theta = 0, rho = 0;
   int x = 0, y = 0;
   //
   while (1) {
-    if (_canInvoke) {
+    if (!_canInvoke) {
       break;
     }
 
@@ -149,11 +152,17 @@ void SerialCom::invokeRPlidarDriver() {
     size_t count = _countof(nodes);
     op_result = drv->grabScanDataHq(nodes, count);
     if (!IS_OK(op_result)) {
-      qDebug() << "grabScanDataHq failed|res:" << op_result << endl;
+      qDebug() << "ERROR|grabScanDataHq failed|res:" << op_result << endl;
       continue;
     }
+    qDebug() << "grabScanDataHq|count:" << count << endl;
 
-    drv->ascendScanData(nodes, count);
+    op_result = drv->ascendScanData(nodes, count);
+    if (!IS_OK(op_result)) {
+      qDebug() << "ERROR|ascendScanData|res:" << op_result << endl;
+    }
+    qDebug() << "ascendScanData|count:" << count << endl;
+
     QList<QPoint> list0;
     for (int pos = 0; pos < (int)count; ++pos) {
       if (nodes[pos].dist_mm_q2 / 4.0f == 0) {
@@ -171,7 +180,7 @@ void SerialCom::invokeRPlidarDriver() {
                << " y:" << y << endl;
       list0.append(QPoint(x, y));
     }
-
+    qDebug() << "emitPoints|list size:" << list0.size() << endl;
     //
     emit exportPoints(list0);
   }
