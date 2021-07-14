@@ -20,6 +20,7 @@ class Ui_SerialCom {
   QPushButton *OpenSerialButton;
   QLabel *label;
   QLabel *label_2;
+  QTextEdit *text0;
   QComboBox *BaudBox;
   QComboBox *PortBox;
 
@@ -59,6 +60,10 @@ class Ui_SerialCom {
     OpenSerialButton->setGeometry(QRect(20, 140, 213, 30));
     OpenSerialButton->setText("打开串口");
 
+    //
+    text0 = new QTextEdit(widget);
+    text0->setObjectName(QString::fromUtf8("textEdit"));
+    text0->setGeometry(QRect(30, 350, 341, 131));
     QMetaObject::connectSlotsByName(widget);
   }  // setupUi
 };

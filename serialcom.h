@@ -1,6 +1,7 @@
 #ifndef SERIALCOM_H
 #define SERIALCOM_H
 
+#include <lidarpoint.h>
 #include <QThread>
 #include <QWidget>
 #include <QtSerialPort/QSerialPort>
@@ -17,8 +18,8 @@ class SerialCom : public QWidget {
    public:
     void run();
     void doInvoke();
-    QList<QPoint> getPoints();
-    void savePoints(QList<QPoint> list0);
+    QList<LidarPoint> getPoints();
+    void savePoints(QList<LidarPoint> list0);
     void setPortName(QString portName);
     void setBaudRate(uint32_t baudRate);
     void startInvoke();
@@ -28,7 +29,7 @@ class SerialCom : public QWidget {
    private:
     QString _portName;
     uint32_t _baudRate;
-    QList<QPoint> _points;  // 绘制点
+    QList<LidarPoint> _points;  // 绘制点
     bool _startInvoke;
   };
 
@@ -37,7 +38,7 @@ class SerialCom : public QWidget {
   explicit SerialCom(QWidget *parent = nullptr, int _exportInterval = 500);
 
  signals:
-  void exportPoints(QList<QPoint>);
+  void exportPoints(QList<LidarPoint>);
   void startScan(bool);
 
  protected:
@@ -58,7 +59,7 @@ class SerialCom : public QWidget {
   void changeEditMod(bool);
   void startInvoke();
   void stopInvoke();
-  void savePoints(QList<QPoint>);
+  void showPoints(const QList<LidarPoint> &list0);
 };
 
 #endif  // SERIALCOM_H

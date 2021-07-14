@@ -123,14 +123,14 @@ void Radar::timerEvent(QTimerEvent *event) {
 }
 
 //
-void Radar::setPoints(QList<QPoint> points) {
+void Radar::setPoints(QList<LidarPoint> points) {
   if (points.size() == 0) {
     return;
   }
 
   mutexlock.lock();
   _points = points;
-  qDebug() << "radar recv points:" << _points << endl;
+  qDebug() << "radar recv points:" << _points.size() << endl;
   mutexlock.unlock();
 }
 

@@ -87,7 +87,10 @@ void SerialCom::startInvoke() {
 }
 
 //
-void SerialCom::stopInvoke() { _invokeThread0.stopInvoke(); }
+void SerialCom::stopInvoke() {
+  _invokeThread0.stopInvoke();
+  //  ui->text0->clear();
+}
 
 //
 void SerialCom::timerEvent(QTimerEvent *event) {
@@ -95,13 +98,34 @@ void SerialCom::timerEvent(QTimerEvent *event) {
   if (_timerId != currentId || !_canInvoke) {
     return;
   }
-  QList<QPoint> list0 = _invokeThread0.getPoints();
+  // 获取点信息
+  QList<LidarPoint> list0 = _invokeThread0.getPoints();
   _exportCnt++;
+  showPoints(list0);
+
+  // 导出点信息
   emit exportPoints(list0);
+  // 刷新点
   if (_exportCnt % 20 == 0) {
     _invokeThread0.clearPoints();
   }
 }
+
+void SerialCom::showPoints(const QList<LidarPoint> &list0) {
+  //
+  QString s0;
+  for (int i = 0; i < list0.size(); ++i) {
+    QString status = QString("angle: %1, dist: %2, x: %3, y: %4\n")
+                         .arg(list0.at(i).angle())
+                         .arg(list0.at(i).dist())
+                         .arg(list0.at(i).x())
+                         .arg(list0.at(i).y());
+    s0 += status;
+  }
+  ui->text0->setText(s0);
+}
+
+// InvokeThread 类定义
 
 void SerialCom::InvokeThread::run() {
   while (1) {
@@ -112,12 +136,12 @@ void SerialCom::InvokeThread::run() {
   }
 }
 
-void SerialCom::InvokeThread::savePoints(QList<QPoint> list0) {
+void SerialCom::InvokeThread::savePoints(QList<LidarPoint> list0) {
   mutexlock0.lock();
   for (int i = 0; i < list0.size(); ++i) {
     bool equal(false);
     for (int j = 0; j < _points.size(); ++j) {
-      if (_points[j] == list0[i]) {
+      if (_points[j].x() == list0[i].x() && _points[j].y() == list0[i].y()) {
         equal = true;
         break;
       }
@@ -144,8 +168,8 @@ void SerialCom::InvokeThread::setBaudRate(uint32_t baudRate) {
 void SerialCom::InvokeThread::startInvoke() { _startInvoke = true; }
 void SerialCom::InvokeThread::stopInvoke() { _startInvoke = false; }
 
-QList<QPoint> SerialCom::InvokeThread::getPoints() {
-  return QList<QPoint>(_points);
+QList<LidarPoint> SerialCom::InvokeThread::getPoints() {
+  return QList<LidarPoint>(_points);
 }
 
 //
@@ -177,7 +201,7 @@ bool checkRPLIDARHealth(RPlidarDriver *drv) {
 
 //
 void SerialCom::InvokeThread::doInvoke() {
-  //  create the driver instance
+  //    create the driver instance
   RPlidarDriver *drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
   if (!drv) {
     qDebug() << "insufficent memory, exit" << endl;
@@ -244,7 +268,7 @@ void SerialCom::InvokeThread::doInvoke() {
     }
     qDebug() << "ascendScanData|count:" << count << endl;
 
-    QList<QPoint> list0;
+    QList<LidarPoint> list0;
     for (int pos = 0; pos < (int)count; ++pos) {
       if (nodes[pos].dist_mm_q2 / 4.0f == 0) {
         continue;
@@ -259,7 +283,7 @@ void SerialCom::InvokeThread::doInvoke() {
       y = (int)(rho * sin(theta));
       qDebug() << "angle:" << angle << " dist:" << dist << " x:" << x
                << " y:" << y << endl;
-      list0.append(QPoint(x, y));
+      list0.append(LidarPoint(angle, dist, x, y));
     }
     qDebug() << "savePoints|list size:" << list0.size() << endl;
 

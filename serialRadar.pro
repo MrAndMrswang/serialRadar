@@ -23,6 +23,7 @@ SOURCES += \
 
 
 HEADERS += \
+    lidarpoint.h \
     mainwindow.h \
     radar.h \
     serialcom.h \
