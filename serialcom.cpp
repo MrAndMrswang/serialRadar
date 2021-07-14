@@ -1,10 +1,14 @@
-#include "serialcom.h"
-#include "ui_serialcom.h"
+#include <math.h>
+#include <unistd.h>
+#include <QDebug>
+#include <QMutex>
 
 #include "sdk/sdk/include/rplidar.h"
 
-#include <math.h>
-#include <QDebug>
+#include "serialcom.h"
+#include "ui_serialcom.h"
+
+QMutex mutexlock0;
 
 #ifndef _countof
 #define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
@@ -12,16 +16,24 @@
 
 using namespace rp::standalone::rplidar;
 
-SerialCom::SerialCom(QWidget *parent) : ui(new Ui::SerialCom) {
+SerialCom::SerialCom(QWidget *parent, int _exportInterval)
+    : ui(new Ui::SerialCom),
+      _canInvoke(false),
+      _exportInterval(_exportInterval),
+      _exportCnt(0) {
   setParent(parent);
-  ui->setupUi(this);
-  QObject::connect(ui->OpenSerialButton, &QPushButton::clicked, this,
-                   &SerialCom::onOpenSerialButtonClicked);
+  _invokeThread0.start();
   init();
 };
 
 // 针对各数据框进行初始化
 void SerialCom::init() {
+  //
+  ui->setupUi(this);
+  QObject::connect(ui->OpenSerialButton, &QPushButton::clicked, this,
+                   &SerialCom::onOpenSerialButtonClicked);
+
+  //
   qDebug() << "number of available ports:"
            << QSerialPortInfo::availablePorts().size();
   // 设定可用串口
@@ -34,12 +46,14 @@ void SerialCom::init() {
   ui->BaudBox->addItem("115200", QSerialPort::Baud115200);
   ui->BaudBox->addItem("256000", 256000);
   ui->BaudBox->setCurrentIndex(0);
+
+  // 启动定时器
+  _timerId = startTimer(_exportInterval);
 }
 
 void SerialCom::onOpenSerialButtonClicked() {
   if (ui->PortBox->isEnabled()) {
     changeEditMod(false);
-    invokeRPlidarDriver();
     emit startScan(true);
   } else {
     //恢复设置使能
@@ -56,11 +70,82 @@ void SerialCom::changeEditMod(bool flag) {
   if (flag) {
     tips0 = "打开串口";
     _canInvoke = false;
+    stopInvoke();
   } else {
     tips0 = "关闭串口";
     _canInvoke = true;
+    startInvoke();
   }
   ui->OpenSerialButton->setText(tips0);
+}
+
+//
+void SerialCom::startInvoke() {
+  _invokeThread0.setPortName(ui->PortBox->currentText());
+  _invokeThread0.setBaudRate(ui->BaudBox->currentData().toUInt());
+  _invokeThread0.startInvoke();
+}
+
+//
+void SerialCom::stopInvoke() { _invokeThread0.stopInvoke(); }
+
+//
+void SerialCom::timerEvent(QTimerEvent *event) {
+  int currentId = event->timerId();
+  if (_timerId != currentId || !_canInvoke) {
+    return;
+  }
+  QList<QPoint> list0 = _invokeThread0.getPoints();
+  _exportCnt++;
+  emit exportPoints(list0);
+  if (_exportCnt % 20 == 0) {
+    _invokeThread0.clearPoints();
+  }
+}
+
+void SerialCom::InvokeThread::run() {
+  while (1) {
+    if (!_startInvoke) {
+      continue;
+    }
+    doInvoke();
+  }
+}
+
+void SerialCom::InvokeThread::savePoints(QList<QPoint> list0) {
+  mutexlock0.lock();
+  for (int i = 0; i < list0.size(); ++i) {
+    bool equal(false);
+    for (int j = 0; j < _points.size(); ++j) {
+      if (_points[j] == list0[i]) {
+        equal = true;
+        break;
+      }
+    }
+    if (!equal) {
+      _points.append(list0[i]);
+    }
+  }
+  mutexlock0.unlock();
+}
+
+void SerialCom::InvokeThread::clearPoints() {
+  mutexlock0.lock();
+  _points.clear();
+  mutexlock0.unlock();
+}
+
+void SerialCom::InvokeThread::setPortName(QString portName) {
+  _portName = portName;
+}
+void SerialCom::InvokeThread::setBaudRate(uint32_t baudRate) {
+  _baudRate = baudRate;
+}
+void SerialCom::InvokeThread::startInvoke() { _startInvoke = true; }
+void SerialCom::InvokeThread::stopInvoke() { _startInvoke = false; }
+
+QList<QPoint> SerialCom::InvokeThread::getPoints() {
+  return QList<QPoint>(_points);
 }
 
 //
@@ -91,8 +176,8 @@ bool checkRPLIDARHealth(RPlidarDriver *drv) {
 }
 
 //
-void SerialCom::invokeRPlidarDriver() {
-  // create the driver instance
+void SerialCom::InvokeThread::doInvoke() {
+  //  create the driver instance
   RPlidarDriver *drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
   if (!drv) {
     qDebug() << "insufficent memory, exit" << endl;
@@ -101,16 +186,12 @@ void SerialCom::invokeRPlidarDriver() {
 
   //
   rplidar_response_device_info_t devinfo;
-
-  char *portName =
-      const_cast<char *>(ui->PortBox->currentText().toStdString().c_str());
-  uint32_t baudRate = ui->BaudBox->currentData().toUInt();
   u_result op_result;
-
-  qDebug() << "start connect|" << portName << "|" << baudRate << endl;
+  char *p0 = const_cast<char *>(_portName.toStdString().c_str());
+  qDebug() << "start connect|" << p0 << "|" << _baudRate << endl;
 
   if (!drv) drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
-  op_result = drv->connect(portName, baudRate);
+  op_result = drv->connect(p0, _baudRate);
   if (!IS_OK(op_result)) {
     qDebug() << "ERROR|connect failed|res:" << op_result << endl;
     return;
@@ -142,12 +223,12 @@ void SerialCom::invokeRPlidarDriver() {
   //
   double angle = 0, dist = 0, theta = 0, rho = 0;
   int x = 0, y = 0;
-  //
+
   while (1) {
-    if (!_canInvoke) {
+    if (!_startInvoke) {
+      qDebug() << "doInvoke() stop invoke" << endl;
       break;
     }
-
     rplidar_response_measurement_node_hq_t nodes[8192];
     size_t count = _countof(nodes);
     op_result = drv->grabScanDataHq(nodes, count);
@@ -180,9 +261,9 @@ void SerialCom::invokeRPlidarDriver() {
                << " y:" << y << endl;
       list0.append(QPoint(x, y));
     }
-    qDebug() << "emitPoints|list size:" << list0.size() << endl;
-    //
-    emit exportPoints(list0);
+    qDebug() << "savePoints|list size:" << list0.size() << endl;
+
+    savePoints(list0);
   }
   drv->stop();
   drv->stopMotor();

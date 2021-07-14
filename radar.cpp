@@ -1,11 +1,17 @@
-#include "radar.h"
 #include <math.h>
+
 #include <QConicalGradient>
 #include <QDebug>
+#include <QMutex>
 #include <QPainter>
 #include <QTimerEvent>
 
-#define MAX_POINTS_SIZE 9999
+#include "radar.h"
+
+#define ZOOM_OUT 26.66  // 16000/600
+
+QMutex mutexlock;
+
 //
 Radar::Radar(QWidget *parent, int speed) : QWidget(parent), _speed(speed) {
   init();
@@ -77,8 +83,10 @@ void Radar::paintSector(QPainter *painter) {
 //
 void Radar::paintPoints(QPainter *painter) {
   for (int i = 0; i < _points.count(); ++i) {
-    painter->setPen(QPen(QColor(255, 255, 255, 150), 3));
-    painter->drawPoint(_points.at(i));
+    painter->setPen(QPen(QColor(255, 0, 0, 150), 3));
+    QPoint p0(_points.at(i).x() / ZOOM_OUT + _drawArea.center().x(),
+              _points.at(i).y() / ZOOM_OUT + _drawArea.center().y());
+    painter->drawPoint(p0);
   }
 }
 
@@ -116,17 +124,14 @@ void Radar::timerEvent(QTimerEvent *event) {
 
 //
 void Radar::setPoints(QList<QPoint> points) {
-  qDebug() << "current points size:" << _points.size()
-           << " add points size:" << points.size() << endl;
   if (points.size() == 0) {
     return;
   }
 
-  // 如果现有点很多，需要删除
-  if (_points.size() > MAX_POINTS_SIZE) {
-    _points.clear();
-  }
-  _points.append(points);
+  mutexlock.lock();
+  _points = points;
+  qDebug() << "radar recv points:" << _points << endl;
+  mutexlock.unlock();
 }
 
 //

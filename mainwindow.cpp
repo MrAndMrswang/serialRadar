@@ -5,12 +5,12 @@
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   //
   SerialCom* serial = new SerialCom(this);
-  setFixedSize(1000, 800);
+  setFixedSize(1200, 800);
   serial->show();
 
   //
   Radar* radar = new Radar(this, 50);
-  radar->setFixedSize(400, 400);
+  radar->setFixedSize(600, 600);
   radar->move(400, 120);
 
   // 将点信息从串口类发送给radar图
